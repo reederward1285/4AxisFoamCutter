@@ -1,0 +1,2 @@
+;Left  airfoil :  | R:0.00 S100.00 TX0.00 TY0.00 D0.00
+;Right airfoil :  | R:0.00 S100.00 TX0.00 TY0.00 D0.00

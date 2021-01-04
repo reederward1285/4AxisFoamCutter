@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Gcode Generator
+Exec=cd && cd GermanyInternship && ./Gcode_Generator.sh
+Terminal=true
+Type=Application
+Icon=/home/reeder/GermanyInternship/docs/download.jpeg

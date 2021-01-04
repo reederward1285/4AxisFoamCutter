@@ -1,0 +1,15 @@
+sudo apt -y update
+sudo apt -y install default-jre
+sudo apt -y install default-jdk
+echo ""
+echo ""
+echo "+------------------------+"
+echo "| Java Compiler Version: |"
+echo "+------------------------+"
+javac -version
+echo ""
+echo ""
+echo "+-------------------+"
+echo "| Java JDK Version: |"
+echo "+-------------------+"
+java -version

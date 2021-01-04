@@ -1,0 +1,14 @@
+# Install Java 8 jre + jdk
+sudo apt -y install libcanberra-gtk-module
+
+echo ""
+echo "+---------------+"
+echo "| Select Java 8 |"
+echo "+---------------+"
+echo ""
+
+sudo apt -y install openjdk-8-jre
+sudo update-alternatives --config java
+
+sudo apt -y install openjdk-8-jdk
+sudo update-alternatives --config javac
