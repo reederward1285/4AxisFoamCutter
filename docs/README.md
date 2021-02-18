@@ -25,6 +25,15 @@
 	```
 	sudo apt -y install libatk-adaptor:i386
 	```
+6. Traceback (most recent call last):
+   File "pywing-1.0.0/pywing.py", line 3, in <module>
+   from PyQt5 import QtCore, QtGui, Qt
+   ImportError: libQt5Core.so.5: cannot open shared object file: No such file or directory
+
+   ```
+   sudo strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5
+   ```
+   
 
 # Errors connecting to Arduino
 

@@ -24,6 +24,42 @@ class Airfoil(QtCore.QObject):
         if filename is not None :
             self.load(filename)
     ###############################################
+    def load_cutting_path(self, filename):
+        x = list()
+        y = list()
+        fp = open(filename)
+        line = ' '
+        while line != "":
+            line = fp.readline()
+            words = line.split()
+            try:
+                if len(words) == 2:
+                    a, b = (float(words[0]), float(words[1]))
+                    x.append(a)
+                    y.append(b)
+            except ValueError:
+                pass
+        self.orig_data = np.array([x, y])
+
+        # normalize x between 0 and 1
+        min_x = self.orig_data[0].min()
+        max_x = self.orig_data[0].max()
+        self.orig_data[0] -= min_x
+        if(max_x == min_x):
+            self.loaded = False
+            return
+        self.orig_data /= (max_x - min_x)
+
+        #if(not self.__compute_leading_edge()):
+        #    self.orig_data = self.trans_data = np.array([[],[]])
+        #    self.loaded = False
+        #    return
+
+        self.orig_data[0] = -self.orig_data[0]
+        self.loaded = True
+        self.name = os.path.splitext(os.path.basename(filename))[0]
+        self.__apply_transform()
+
     def load(self, filename):
         x = list()
         y = list()

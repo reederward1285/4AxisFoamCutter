@@ -8,13 +8,14 @@ import sys
 import time
 import queue
 import serial.tools.list_ports
+import math
+import os
 # from pynput import keyboard
 # from PyQt5.QtCore import pyqtRemoveInputHook
 
 from airfoil import Airfoil
 
 airfoil_data_folder = QtCore.QDir.homePath() + "/.airfoils"
-
 
 class ConnectedAirfoilsModel(QtCore.QObject):
     data_changed = QtCore.pyqtSignal()
@@ -45,8 +46,58 @@ class ConnectedAirfoilsModel(QtCore.QObject):
     def generate_gcode(self, feedrate):
         gcode = list()
         if(self.af_left.loaded and self.af_right.loaded):
+            # turn on the spindle (hotwire) at the given temp
+            gcode.append("M3 S" + str(control_widget.temp_spbox.value()) + "\n")
             gcode.append("M7\n")
             gcode.append("F%.2f\n" % feedrate)
+
+            # example coordinate for cutting block to size:
+            # (x, y) -> x = x and u, y = y and z
+            if (control_widget.cutBlockToSizeCheckbox.isChecked()):
+                # (0, 0)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (0, 0, 0, 0))
+
+                # (0, block height)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (0,
+                            control_widget.block_height_spbox.value(),
+                            0,
+                            control_widget.block_height_spbox.value()))
+
+                # (block length, block height)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (control_widget.block_length_spbox.value(),
+                            control_widget.block_height_spbox.value(),
+                            control_widget.block_length_spbox.value(),
+                            control_widget.block_height_spbox.value()))
+
+                # (block length, 0)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (control_widget.block_length_spbox.value(),
+                            0,
+                            control_widget.block_length_spbox.value(),
+                            0))
+
+                # (block length, block height)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (control_widget.block_length_spbox.value(),
+                            control_widget.block_height_spbox.value(),
+                            control_widget.block_length_spbox.value(),
+                            control_widget.block_height_spbox.value()))
+
+                # (0, block height)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (0,
+                            control_widget.block_height_spbox.value(),
+                            0,
+                            control_widget.block_height_spbox.value()))
+
+                # (0, 0)
+                gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
+                            (0, 0, 0, 0))
+
+            # Cut the wing profiles
             gcode.append("G01 X%.3f Y%.3f U%.3f Z%.3f\n" %
                          (self.af_right.start[0],
                           self.af_right.start[1],
@@ -112,13 +163,15 @@ class AirfoilItemManager:
         self.rot_spbox.setSuffix("°")
         self.rot_spbox.valueChanged.connect(self.on_rot)
 
+        # Wing Chord (or scale, of the profile)
         self.scale_spbox = QtGui.QDoubleSpinBox()
         self.scale_spbox.setRange(1, 10000)
         self.scale_spbox.setValue(self.airfoil.s)
-        self.scale_spbox.setPrefix("S : ")
+        self.scale_spbox.setPrefix("C : ")
         self.scale_spbox.setSuffix("mm")
         self.scale_spbox.valueChanged.connect(self.on_scale)
 
+        # Translate X
         self.tx_spbox = QtGui.QDoubleSpinBox()
         self.tx_spbox.setRange(-10000, 10000)
         self.tx_spbox.setValue(self.airfoil.t[0])
@@ -126,6 +179,7 @@ class AirfoilItemManager:
         self.tx_spbox.setSuffix("mm")
         self.tx_spbox.valueChanged.connect(self.on_tx)
 
+        # Translate Y
         self.ty_spbox = QtGui.QDoubleSpinBox()
         self.ty_spbox.setRange(-10000, 10000)
         self.ty_spbox.setValue(self.airfoil.t[1])
@@ -133,8 +187,10 @@ class AirfoilItemManager:
         self.ty_spbox.setSuffix("mm")
         self.ty_spbox.valueChanged.connect(self.on_ty)
 
+        # Dilate
         self.dilate_spbox = QtGui.QDoubleSpinBox()
         self.dilate_spbox.setRange(0, 100)
+        self.airfoil.d = 1
         self.dilate_spbox.setValue(self.airfoil.d)
         self.dilate_spbox.setSingleStep(0.1)
         self.dilate_spbox.setPrefix("D : ")
@@ -155,9 +211,11 @@ class AirfoilItemManager:
                               self.airfoil.end[1], self.airfoil.trans_data[1][-1]])
 
     def on_load(self):
-        filename, _ = QtGui.QFileDialog.getOpenFileName(
-            self.load_btn.parent(), "Open File", airfoil_data_folder, "All Files (*)")
-        if filename:
+        filename, _ = QtGui.QFileDialog.getOpenFileName(self.load_btn.parent(),
+                                                        "Open File",
+                                                        "",
+                                                        "All Files (*)")
+        if filename: #TODO: add conditional here
             self.airfoil.load(filename)
             self.name.setText(self.airfoil.name)
 
@@ -166,6 +224,10 @@ class AirfoilItemManager:
 
     def on_scale(self):
         self.airfoil.scale(self.scale_spbox.value())
+
+    def scale_to_value(self, scale):
+        self.airfoil.scale(scale)
+        self.scale_spbox.setValue(scale)
 
     def on_tx(self):
         self.airfoil.translate_x(self.tx_spbox.value())
@@ -464,7 +526,7 @@ class SerialThread(QtCore.QThread):
 class ControlWidget(QtGui.QWidget):
     def __init__(self, connected_airfoils, machine):
         super().__init__()
-        
+
         self._connected_airfoils = connected_airfoils
         self.serial_thread = SerialThread(machine)
         self.serial_thread.connection_changed.connect(
@@ -480,9 +542,25 @@ class ControlWidget(QtGui.QWidget):
         self.connect_btn = QtGui.QPushButton("Connect")
         self.connect_btn.clicked.connect(self.on_connect)
 
+        # Auto - Scale Checkbox
+        self.autoScaleCheckbox = QCheckBox("Auto-scale")
+
+        # Cut Block to Size Checkbox
+        self.cutBlockToSizeCheckbox = QCheckBox("Cut Block to Size")
+
         # Generate Gcode File button
         saveFile_btn = QtGui.QPushButton("save")
         saveFile_btn.clicked.connect(self.on_save)
+
+        # Styrofoam Profiles
+        self.import_styrofoam_profile_label = QtGui.QLabel(text="Import profile:")
+        self.save_styrofoam_profile_label = QtGui.QLabel(text="Save profile:")
+
+        self.import_styrofoam_profile_button = QtGui.QPushButton("Import")
+        self.import_styrofoam_profile_button.clicked.connect(self.import_styrofoam_profile)
+
+        self.save_styrofoam_profile_button = QtGui.QPushButton("Save")
+        self.save_styrofoam_profile_button.clicked.connect(self.save_styrofoam_profile)
 
         # Jogging buttons
         jog_btn_x_positive = QtGui.QPushButton("X+")
@@ -514,13 +592,35 @@ class ControlWidget(QtGui.QWidget):
         self.port_box.setInsertPolicy(QtGui.QComboBox.InsertAlphabetically)
         self.port_box.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
 
+        # set zero button
+        self.setZeroButton = QtGui.QPushButton("Set Zero")
+        self.setZeroButton.clicked.connect(self.on_set_zero)
+
         # feedrate
         self.feed_spbox = QtGui.QDoubleSpinBox()
         self.feed_spbox.setRange(1, 1000)
         self.feed_spbox.setValue(500)
         self.feed_spbox.setSingleStep(10)
-        self.feed_spbox.setPrefix("Feedrate : ")
+        self.feed_spbox.setPrefix("Feedrate: ")
         self.feed_spbox.setSuffix("mm/s")
+
+        # milliamps (Amperes, temperature of the wire)
+        self.temp_spbox = QtGui.QDoubleSpinBox()
+        self.temp_spbox.setRange(0, 12000)
+        self.temp_spbox.setValue(1000)
+        self.temp_spbox.setSingleStep(100)
+        self.temp_spbox.setPrefix("Temp: ")
+        self.temp_spbox.setSuffix("mA")
+        self.temp_spbox.valueChanged.connect(self.on_temperature_change)
+
+        # wing span
+        self.span_spbox = QtGui.QDoubleSpinBox()
+        self.span_spbox.setRange(1, 1200)
+        self.span_spbox.setValue(1000)
+        self.span_spbox.setSingleStep(10)
+        self.span_spbox.setPrefix("Wing span: ")
+        self.span_spbox.setSuffix("mm")
+        self.span_spbox.valueChanged.connect(self.on_wing_span_change)
 
         # block width
         self.block_width_spbox = QtGui.QDoubleSpinBox()
@@ -561,28 +661,37 @@ class ControlWidget(QtGui.QWidget):
         self.lead_spbox = QtGui.QDoubleSpinBox()
         self.lead_spbox.setRange(1, 1000)
         self.lead_spbox.setValue(self._connected_airfoils.af_left.lead_in_out)
-        self.lead_spbox.setPrefix("Lead in/out : ")
+        self.lead_spbox.setPrefix("Lead in/out: ")
         self.lead_spbox.setSuffix("mm")
         self.lead_spbox.valueChanged.connect(self.on_lead_change)
 
         # add all of the widgets to the layout
-        layout.addWidget(self.feed_spbox, 0, 0)
+        layout.addWidget(self.feed_spbox, 5, 0)
         layout.addWidget(self.lead_spbox, 1, 0)
         layout.addWidget(self.block_width_spbox, 2, 0)
         layout.addWidget(self.block_height_spbox, 3, 0)
         layout.addWidget(self.block_length_spbox, 4, 0)
-        layout.addWidget(self.block_offset_spbox, 5, 0)
-        layout.addWidget(play_btn, 6, 0)
-        layout.addWidget(stop_btn, 7, 0)
+        layout.addWidget(self.block_offset_spbox, 0, 0)
+        layout.addWidget(self.span_spbox, 6, 0)
+        layout.addWidget(self.temp_spbox, 7, 0)
+        layout.addWidget(play_btn, 4, 5)
+        layout.addWidget(stop_btn, 4, 6)
         layout.addWidget(saveFile_btn, 8, 0)
-        layout.addWidget(jog_btn_x_positive, 2, 5)
-        layout.addWidget(jog_btn_x_negative, 2, 6)
-        layout.addWidget(jog_btn_y_positive, 3, 5)
-        layout.addWidget(jog_btn_y_negative, 3, 6)
-        layout.addWidget(jog_btn_u_positive, 4, 5)
-        layout.addWidget(jog_btn_u_negative, 4, 6)
-        layout.addWidget(jog_btn_z_positive, 5, 5)
-        layout.addWidget(jog_btn_z_negative, 5, 6)
+        layout.addWidget(self.import_styrofoam_profile_label, 1, 5)
+        layout.addWidget(self.import_styrofoam_profile_button, 1, 6)
+        layout.addWidget(self.save_styrofoam_profile_label, 2, 5)
+        layout.addWidget(self.save_styrofoam_profile_button, 2, 6)
+        layout.addWidget(self.autoScaleCheckbox, 3, 5)
+        layout.addWidget(self.cutBlockToSizeCheckbox, 3, 6)
+        layout.addWidget(self.setZeroButton, 5, 6)
+        layout.addWidget(jog_btn_x_positive, 6, 5)
+        layout.addWidget(jog_btn_x_negative, 6, 6)
+        layout.addWidget(jog_btn_y_positive, 7, 5)
+        layout.addWidget(jog_btn_y_negative, 7, 6)
+        layout.addWidget(jog_btn_u_positive, 8, 5)
+        layout.addWidget(jog_btn_u_negative, 8, 6)
+        layout.addWidget(jog_btn_z_positive, 9, 5)
+        layout.addWidget(jog_btn_z_negative, 9, 6)
         layout.addWidget(self.serial_text_item, 0, 1, 5, 1)
         layout.setColumnStretch(0, 1)
         layout.setColumnStretch(1, 5)
@@ -591,6 +700,11 @@ class ControlWidget(QtGui.QWidget):
 
         # finish and apply layout
         self.setLayout(layout)
+
+    def on_set_zero(self):
+        self.serial_thread.disconnect()
+        time.sleep(1)
+        self.serial_thread.connect(self.port_box.currentText())
 
     def on_connection_change(self):
         if(self.serial_thread.connecting):
@@ -604,6 +718,13 @@ class ControlWidget(QtGui.QWidget):
             self.connect_btn.setFlat(False)
 
         self.connect_btn.setText(text)
+
+    def on_temperature_change(self):
+        temperature = self.temp_spbox.value()
+        gcode = self.get_jog_gcode_header()
+        gcode.append("M3 S" + str(temperature) + "\n")
+        print(gcode)
+        self.serial_thread.play(gcode)
 
     def on_port_list_change(self):
         new_items = self.serial_thread.port_list
@@ -643,18 +764,131 @@ class ControlWidget(QtGui.QWidget):
             print("Need to decrease length by a minimum of " + str(int(self.block_length_spbox.value() - 580)) + "mm")
             return False
         elif (side_view_widget.aim_left.scale_spbox.value() > 580):
-              print("Error: length of the left wing profile is too long!")
-              print("Need to decrease the length of the left profile by a minimum of " +
-                    str(int(side_view_widget.aim_left.scale_spbox.value() - 580)) + "mm")
-              return False
+            print("Error: length of the left wing profile is too long!")
+            print("Need to decrease the length of the left profile by a minimum of " +
+                  str(int(side_view_widget.aim_left.scale_spbox.value() - 580)) + "mm")
+            return False
         elif (side_view_widget.aim_right.scale_spbox.value() > 580):
-              print("Error: length of the right wing profile is too long!")
-              print("Need to decrease the length of the right profile by a minimum of " +
-                    str(int(side_view_widget.aim_right.scale_spbox.value() - 580)) + "mm")
-              return False
+            print("Error: length of the right wing profile is too long!")
+            print("Need to decrease the length of the right profile by a minimum of " +
+                  str(int(side_view_widget.aim_right.scale_spbox.value() - 580)) + "mm")
+            return False
+        elif (self.block_width_spbox.value() < self.span_spbox.value()):
+            print("Error: wing span is greater than the block size!")
+            print("Need to decrease the wing span (or increase the block size) by a minimum of " +
+                  str(int(self.span_spbox.value() - self.block_width_spbox.value())) + "mm")
         return True
 
+    def on_wing_span_change(self):
+        # check that the change is valid/invalid
+        if (self.dimensions_fit()):
+            # update the scale accordingly
+            if (control_widget.autoScaleCheckbox.isChecked()):
+                side_view_widget.aim_left.scale_to_value(self.calculate_profile_scaling_percentage())
+            return True
+        return False
+
+    def calculate_projected_coordinate(self, left_coord, right_coord):
+        x_axis_length = 1200
+        x_prime = left_coord
+        y_prime = right_coord
+
+        # delta_x = left_coord_x - right_coord_x
+        delta_x = left_coord[0] - right_coord[0]
+
+        # delta_y = left_coord_y - right_coord_y
+        delta_y = left_coord[1] - right_coord[1]
+
+        # delta_z = x_axis_length - offset
+        delta_z = x_axis_length - self.block_offset_spbox.value()
+
+        # find vector of length == 1 by dividing by length
+        # length: sqrt(x^2 + y^2 + z^2)
+        length = math.sqrt(pow(delta_x, 2) + pow(delta_y, 2) + pow(delta_z, 2))
+
+        # divide each component by length, to get a vector of length 1
+        delta_x_unit_vector = delta_x / length
+        delta_y_unit_vector = delta_y / length
+        delta_z_unit_vector = delta_z / length
+
+        # multiply each component of the unit vector by x_axis_length to
+        # get the new coordinates of the vector projecting all the way
+        # to portal #1.
+        x_prime = delta_x_unit_vector * x_axis_length
+        y_prime = delta_y_unit_vector * x_axis_length
+
+        return [x_prime, y_prime]
+
+    def distance(self, first_coord, second_coord):
+        return math.sqrt(pow((first_coord[0] - second_coord[0]), 2) + pow((first_coord[1] - second_coord[1]), 2))
+
+    # Once wingspan and offset are defined, calculate the scale adjustment
+    # necessary to make the wing fit in the styrofoam at the correct offset.
+    # For example, if the wingspan is 100mm, and the offset is 100mm, then
+    # scale profile #1 up/down accordingly so that the wing is cut at the correct
+    # size within the piece of styrofoam.
+    def calculate_profile_scaling_percentage(self):
+        # set it to the current scale value
+        old_scale = side_view_widget.aim_left.scale_spbox.value()
+        new_scale = old_scale
+        print("Current scale is: " + str(new_scale))
+
+        # count the number of coordinates in the 1st *.dat file, and
+        num_coordinates_1 = len(connect_airfoils.it_point_list_left[0])
+
+        # store the first and middle coordinates in two arrays.
+        first_coord_index_1 = 0
+        middle_coord_index_1 = num_coordinates_1 // 2
+
+        first_coord_1 = [connect_airfoils.it_point_list_left[0][first_coord_index_1],
+                       connect_airfoils.it_point_list_left[1][first_coord_index_1]]
+
+        middle_coord_1 = [connect_airfoils.it_point_list_left[0][middle_coord_index_1],
+                        connect_airfoils.it_point_list_left[1][middle_coord_index_1]]
+
+        # count the number of coordinates in the 2nd *.dat file, and
+        num_coordinates_2 = len(connect_airfoils.it_point_list_right[0])
+
+        # store the first and middle coordinates in two arrays.
+        first_coord_index_2 = 0
+        middle_coord_index_2 = num_coordinates_2 // 2
+
+        first_coord_2 = [connect_airfoils.it_point_list_right[0][first_coord_index_2],
+                         connect_airfoils.it_point_list_right[1][first_coord_index_2]]
+
+        middle_coord_2 = [connect_airfoils.it_point_list_right[0][middle_coord_index_2],
+                          connect_airfoils.it_point_list_right[1][middle_coord_index_2]]
+
+        # Use the calculation routine to find out what first_coord'
+        # and middle_coord' are.
+        coordintates_prime_1 = self.calculate_projected_coordinate(first_coord_2, first_coord_1)
+        coordintates_prime_2 = self.calculate_projected_coordinate(middle_coord_2, middle_coord_1)
+
+        # Use the distance formula for each set of coordinates. Then
+        # calculate the % of change (+/-), and make sure to convert
+        # it to a negative or positive integer.
+        length_original_coord = self.distance(first_coord_1, middle_coord_1)
+        length_prime_coord = self.distance(coordintates_prime_1, coordintates_prime_2)
+
+        # Return the integer for profile #1 to be scaled to
+        new_scale = (length_prime_coord - length_original_coord) / (length_original_coord) * 100
+
+        if (new_scale == 0):
+            new_scale = old_scale
+        elif (new_scale < 0):
+            new_scale = new_scale * -1
+        elif (new_scale > self.block_length_spbox.value()):
+            new_scale = self.block_length_spbox.value()
+
+        print("New adjusted scale is " + str(new_scale))
+
+        return new_scale
+
     def on_play(self):
+        # TODO: test this: scale the wing to fit inside of the block
+        # new_scale = self.calculate_profile_scaling_percentage()
+
+        # check that the dimensions fit
         if (not self.dimensions_fit()):
             print("\nDimensions of the machine are 1200mm x 580mm x 320mm\n")
             return
@@ -682,8 +916,6 @@ class ControlWidget(QtGui.QWidget):
             self.serial_data += command
         self.serial_text_item.setText(self.serial_data)
 
-        # print(gcode)
-
         self.serial_thread.play(gcode)
 
     def get_jog_gcode_header(self):
@@ -692,6 +924,45 @@ class ControlWidget(QtGui.QWidget):
         gcode.append("M7\n")
         gcode.append("F" + str(self.feed_spbox.value()) + "\n")
         return gcode
+
+    def import_styrofoam_profile(self):
+        filename = QtGui.QFileDialog.getOpenFileName(self.import_styrofoam_profile_button.parent(),
+                                                     "Open Temperature/Speed Profile",
+                                                     "",
+                                                     "All Files (*)")
+        if filename:
+            # Change font to bold, and show filename after importing
+            myFont=QtGui.QFont()
+            myFont.setBold(True)
+            label_filename = str(os.path.splitext(os.path.basename(filename[0]))[0])
+            print("Filename of imported profile is: " + filename[0])
+            print("Trimmed filepath: " + label_filename)
+
+            # update the label to show that the file was imported
+            control_widget.import_styrofoam_profile_label.setText(label_filename)
+            control_widget.import_styrofoam_profile_label.setFont(myFont)
+
+            # read the file and import it
+            with open(filename[0], 'r') as temp_profile_file:
+                # read in the temperature
+                new_temperature = temp_profile_file.readline()
+
+                # make sure it exists in the file
+                if (new_temperature != ""):
+                    new_feedrate = temp_profile_file.readline()
+
+                    # check that the feedrate value exists
+                    if (new_feedrate != ""):
+                        # set temperature and feedrate
+                        self.temp_spbox.setValue(int(new_temperature))
+                        self.feed_spbox.setValue(int(new_feedrate))
+
+    def save_styrofoam_profile(self):
+        name = QtGui.QFileDialog.getSaveFileName(self, 'Save File', '.', "(*.txt)")
+        file = open(name[0] + ".txt", 'w')
+        text = str(int(self.temp_spbox.value())) + "\r\n" + str(int(self.feed_spbox.value())) + "\r\n"
+        file.write(text)
+        file.close()
 
     def on_jog_x_positive(self):
         gcode = self.get_jog_gcode_header()

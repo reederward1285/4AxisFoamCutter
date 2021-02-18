@@ -1,0 +1,9 @@
+        # AirfoilItemManager.dilate(self.calculate_profile_scaling_percentage())
+        #num_coordinates_left = len(connect_airfoils.it_point_list_left[0])
+        #num_coordinates_left_1 = len(connect_airfoils.it_point_list_right[1])
+        #first_coord = 0
+        # do integer division '//'
+        #middle_coord = num_coordinates_left // 2
+        #print("Number of coordinates in the file: " + str(num_coordinates_left) + ", " + str(num_coordinates_left_1))
+        #print("First coordinate: " + str(first_coord))
+        #print("Middle coordinate: " + str(middle_coord))
