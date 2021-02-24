@@ -1,0 +1,5 @@
+sudo apt-get -y update
+sudo apt-get -y dist-upgrade
+sudo apt -y install python3-pip
+pip3 install pyqt5 pyqtgraph
+sudo apt-get -y install qt5-default

@@ -1,0 +1,1 @@
+sudo apt -y install build-essential qt5-doc qt5-doc-html qtbase5-doc-html qtbase5-examples qt5-default qtcreator
