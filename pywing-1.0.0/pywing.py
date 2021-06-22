@@ -543,7 +543,7 @@ class ControlWidget(QtGui.QWidget):
         self.connect_btn.clicked.connect(self.on_connect)
 
         # Auto - Scale Checkbox
-        self.autoScaleCheckbox = QCheckBox("Auto-scale")
+        self.jogBigStepsCheckbox = QCheckBox("Big Jogging")
 
         # Cut Block to Size Checkbox
         self.cutBlockToSizeCheckbox = QCheckBox("Cut Block to Size")
@@ -681,7 +681,7 @@ class ControlWidget(QtGui.QWidget):
         layout.addWidget(self.import_styrofoam_profile_button, 1, 6)
         layout.addWidget(self.save_styrofoam_profile_label, 2, 5)
         layout.addWidget(self.save_styrofoam_profile_button, 2, 6)
-        layout.addWidget(self.autoScaleCheckbox, 3, 5)
+        layout.addWidget(self.jogBigStepsCheckbox, 3, 5)
         layout.addWidget(self.cutBlockToSizeCheckbox, 3, 6)
         layout.addWidget(self.setZeroButton, 5, 6)
         layout.addWidget(jog_btn_x_positive, 6, 5)
@@ -783,8 +783,8 @@ class ControlWidget(QtGui.QWidget):
         # check that the change is valid/invalid
         if (self.dimensions_fit()):
             # update the scale accordingly
-            if (control_widget.autoScaleCheckbox.isChecked()):
-                side_view_widget.aim_left.scale_to_value(self.calculate_profile_scaling_percentage())
+            #if (control_widget.autoScaleCheckbox.isChecked()):
+                #side_view_widget.aim_left.scale_to_value(self.calculate_profile_scaling_percentage())
             return True
         return False
 
@@ -966,49 +966,81 @@ class ControlWidget(QtGui.QWidget):
 
     def on_jog_x_positive(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 X10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 X100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 X1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_x_negative(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 X-10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 X-100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 X-1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_y_positive(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 Y10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 Y100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 Y1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_y_negative(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 Y-10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 Y-100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 Y-1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_u_positive(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 U10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 U100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 U1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_u_negative(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 U-10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 U-100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 U-1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_z_positive(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 Z10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 Z100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 Z1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
     def on_jog_z_negative(self):
         gcode = self.get_jog_gcode_header()
-        gcode.append("G91 Z-10 F" + str(self.feed_spbox.value()) + "\n")
+
+        if (self.jogBigStepsCheckbox.isChecked()):
+            gcode.append("G91 Z-100 F" + str(self.feed_spbox.value()) + "\n")
+        else:
+            gcode.append("G91 Z-1 F" + str(self.feed_spbox.value()) + "\n")
         print(gcode)
         self.serial_thread.play(gcode)
 
