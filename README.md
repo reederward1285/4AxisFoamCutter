@@ -49,8 +49,8 @@ is an example:
 Then, choose the rest of your settings, connect to the arduino using the connect button, and then hit the play button to start the machine.
 
 # Background:
-## Video:
 I briefly mention this project that was done as a small part of my research internship with Hochschule Bremen in Germany, check out the [video](https://youtu.be/MzpFXPjCONE?si=uv44ZDpD8vEbevWx).
+
 ## CNC Foam Cutting Machine Upgrade
 
 The machine was made by the company Step-Four, however documentation is not available since Step-Four went out of business several years ago.
